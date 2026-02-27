@@ -1,20 +1,28 @@
 import requests
+import argparse
+import sys
 
-def git_act(username, token=None):
-    url=f"https://api.github.com/users/{username}/events"
+BASE_URL = "https://api.github.com"
+
+def git_act(username , limit=10 , event_type=None):
 
     headers={}
-    if token:
-        headers["Authorization"]=f"Bearer {token}"
 
-    response = requests.get(url, headers= headers)
+    if not username:
+        print("❌ Username required if no token provided.")
+        sys.exit(1)
+    
+    url = f"{BASE_URL}/users/{username}/events"
+
+    response = requests.get(url, headers=headers)
 
     if response.status_code == 404:
         print("user not found!")
-        return
+        sys.exit(1)
+
     elif response.status_code != 200:
         print("Error!",response.status_code,response.text)
-        return
+        sys.exit(1)
     
     events = response.json()
 
@@ -24,14 +32,32 @@ def git_act(username, token=None):
     
     print(f"\nRecent Public Activity for '{username}':\n")
 
+    count = 0
+
     for event in events[:10]:
-        event_type=event.get("type")
+        if event_type and event["type"] != event_type:
+            continue
+
         repo_name=event.get("repo",{}).get("name")
         created_at=event.get("created_at")
 
-        print(f"{event_type} | {repo_name} | {created_at}")
+        print(f"{event['type']} | {repo_name} | {created_at}")
+
+        count += 1
+        if count >= limit:
+            break
+
+def main():
+    parser = argparse.ArgumentParser(description="Fetch github user activity")
+
+    parser.add_argument("-u", "--username", help="GitHub username")
+    parser.add_argument("-l", "--limit", type=int, default=10,
+                        help="Number of events to display (default: 10)")
+    parser.add_argument("-e", "--event", help="Filter by event type (e.g., PushEvent)")
+
+    args = parser.parse_args()
+
+    git_act(username=args.username,limit=args.limit, event_type=args.event)
 
 if __name__ == "__main__":
-    username = input("enter Github username:")
-
-    git_act(username)
+    main()
